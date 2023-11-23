@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Helo page</h1>
+<p th:text="${#dates.format(new java.util.Date(),'dd/MMM/yyyy HH:mm')}"></p>
+<p th:text="${#numbers.formatInteger(1234,7)}"></p>
+<p th:text="${#strings.toUpperCase('Welcome to Spring.')}"></p>
+<input type="text" th:value="${msg}" /><br/>
+<p class="msg" th:text="${msg}"></p>
+<p class="msg">
+    [[${msg}]]
+</p>
+</body>
+</html>

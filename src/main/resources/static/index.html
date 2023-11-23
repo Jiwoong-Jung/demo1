@@ -1,0 +1,103 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Chat</title>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.2/dist/sockjs.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+
+<div>
+    <video id="localVideo" width="320" height="240" autoplay></video>
+    <video id="remoteVideo" width="320" height="240" autoplay></video>
+
+    <ul id="chatMessages"></ul>
+    <form id="chatForm">
+        <input type="text" id="sender" placeholder="Your Name">
+        <input type="text" id="message" placeholder="Type your message">
+        <button type="submit">Send</button>
+    </form>
+</div>
+
+<script>
+    var stompClient = null;
+    var localVideo = document.getElementById('localVideo');
+    var remoteVideo = document.getElementById('remoteVideo');
+
+    function connect() {
+        var socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function(frame) {
+            console.log('Connected: ' + frame);
+
+            stompClient.subscribe('/topic/messages', function(message) {
+                showMessage(JSON.parse(message.body));
+            });
+
+            stompClient.subscribe('/topic/videoFrames', function(frame) {
+                showVideoFrame(JSON.parse(frame.body).frame, remoteVideo);
+            });
+        });
+    }
+
+    function disconnect() {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+        }
+        console.log("Disconnected");
+    }
+
+    function sendMessage() {
+        var sender = document.getElementById('sender').value;
+        var message = document.getElementById('message').value;
+
+        stompClient.send("/app/chat", {}, JSON.stringify({
+            'content': message,
+            'sender': sender
+        }));
+    }
+
+    function showVideoFrame(frame, videoElement) {
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d');
+        canvas.width = videoElement.width;
+        canvas.height = videoElement.height;
+
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.putImageData(new ImageData(new Uint8ClampedArray(frame), videoElement.width, videoElement.height), 0, 0);
+
+        videoElement.srcObject = canvas.captureStream();
+    }
+
+    document.getElementById('chatForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        sendMessage();
+    });
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+            localVideo.srcObject = stream;
+            setInterval(function() {
+                var canvas = document.createElement('canvas');
+                var context = canvas.getContext('2d');
+                canvas.width = localVideo.width;
+                canvas.height = localVideo.height;
+                context.drawImage(localVideo, 0, 0, canvas.width, canvas.height);
+                var imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                var frame = new Uint8Array(imageData.data.buffer);
+                stompClient.send("/app/videoFrame", {}, JSON.stringify({'frame': frame}));
+            }, 100);
+        })
+        .catch(function(error) {
+            console.error('Error accessing webcam:', error);
+        });
+
+    connect();
+</script>
+
+</body>
+</html>
